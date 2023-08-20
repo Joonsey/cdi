@@ -2,17 +2,22 @@
 #include <vector>
 #include <cstring>
 #include <cstdint>
+#define ID_SIZE 8
+#define TYPE_SIZE 2
+#define START_ID 1
 
 namespace Packet
 {
-#define ID_SIZE 8
-#define TYPE_SIZE 2
+	enum STATUS {
+		SUCCESS,
+		FAILURE,
+		PENDING
+	};
 
-#define HEADER_SIZE ID_SIZE + TYPE_SIZE
-
-	enum Type {
+	enum TYPE {
 		INIT,
-		INIT_RESPONSE,
+		INIT_SUCCESS,
+		INIT_FAILURE,
 		STATUS,
 		FETCH,
 		PULL,
@@ -23,7 +28,7 @@ namespace Packet
 
 	class Packet  {
 	public:
-		Packet(int id, const std::string& data, Type type)
+		Packet(unsigned int id, const std::string& data, TYPE type)
 			: runner_id(id), packet_data(data), type(type) {}
 
 		void serialize(std::string& buffer) const {
@@ -52,14 +57,14 @@ namespace Packet
 
 		static Packet deserialize(const std::string& buffer) {
 			int runner_id;
-			Type type;
+			TYPE type;
 			std::string packet_data, fake_type, fake_runner_id;
 
 			fake_runner_id = buffer.substr(0, ID_SIZE);
 			runner_id = std::stoi(fake_runner_id);
 
 			fake_type = buffer.substr(ID_SIZE, ID_SIZE+TYPE_SIZE);
-			type = static_cast<Type>(stoi(fake_type));
+			type = static_cast<TYPE>(stoi(fake_type));
 
 			packet_data = buffer.substr(ID_SIZE+TYPE_SIZE);
 
@@ -81,7 +86,7 @@ namespace Packet
 
 	private:
 		int runner_id;
-		Type type;
+		TYPE type;
 		std::string packet_data;
 	};
 }

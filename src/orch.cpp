@@ -68,17 +68,20 @@ private:
 
 			Packet::Packet packet = Packet::Packet::deserialize(buffer);
 
-			std::cout << "ID: " << packet.get_id() << std::endl;
+			std::cout << "ID: "   << packet.get_id()   << std::endl;
 			std::cout << "TYPE: " << packet.get_type() << std::endl;
 			std::cout << "DATA: " << packet.get_data() << std::endl;
 
-			if (packet.get_type() == Packet::Type::INIT) {
-				Packet::Packet response_packet(packet.get_id(), packet.get_data(), Packet::Type::INIT_RESPONSE);
+			if (packet.get_type() == Packet::TYPE::INIT) {
+				Packet::Packet response_packet(packet.get_id(), packet.get_data(), Packet::TYPE::INIT_SUCCESS);
 				packet.serialize(response);
 			}
 
-			if (response.empty()) return;
+			if (packet.get_type() == Packet::TYPE::FETCH) {
+				std::cout << stoi(packet.get_data()) << std::endl;
+			}
 
+			if (response.empty()) return;
 			send_data(client_socket, response);
         }
     }

@@ -19,28 +19,28 @@ public:
 			init_connection();
 		}
 
-    void connect_and_send() {
-        for (int i = 0; i < 10; ++i) {
-            std::string message = "Request " + std::to_string(i);
-            send(client_socket, message.c_str(), message.size(), 0);
-            std::this_thread::sleep_for(std::chrono::seconds(1)); // Delay between requests
-        }
-
-        close(client_socket);
-    }
-
 	Packet::Packet receive_response() {
 		std::string error;
 		char buffer[1024];
 		int bytes_received = recv(client_socket, buffer, 1024, 0);
 
 		if (bytes_received <= 0) {
-			Packet::Packet packet(id, "UNEXPECTED", Packet::Type::ERROR);
+			Packet::Packet packet(id, "UNEXPECTED", Packet::TYPE::ERROR);
 			packet.serialize(error);
 			return packet;
 		}
 
 		return Packet::Packet::deserialize(buffer);
+	}
+
+	void start_loop_threaded() {
+		std::thread main_thread(&TCPClient::main_loop, this);
+		p_main_thread = &main_thread;
+		main_thread.detach();
+	}
+
+	void start_loop() {
+		main_loop();
 	}
 
 private:
@@ -63,19 +63,38 @@ private:
             return;
         }
 
-		Packet::Packet packet(228920, "hello, world", Packet::Type::INIT);
+		Packet::Packet packet(228920, "hello, world", Packet::TYPE::INIT);
 		packet.serialize(init_message);
 
 		send_data(init_message);
+	}
 
+	void main_loop()
+	{
+		while (!quitting) {
+			Packet::Packet response_packet = receive_response();
+			std::string response;
 
-		Packet::Packet response = receive_response();
+			if (response_packet.get_type() == Packet::TYPE::INIT_SUCCESS) {
+				id = stoi(response_packet.get_data());
+			}
 
-		std::cout << "ID: " << response.get_id() << std::endl;
-		std::cout << "TYPE: " << response.get_type() << std::endl;
-		std::cout << "DATA: " << response.get_data() << std::endl;
+			else if (response_packet.get_type() == Packet::TYPE::INIT_FAILURE) {
+				close(client_socket);
+				quitting = true;
+			}
 
+			if (response_packet.get_type() == Packet::TYPE::FETCH) {
+				int status = fetch();
+				Packet::Packet pack(id, std::to_string(status), Packet::TYPE::FETCH);
+				pack.serialize(response);
+				send_data(response);
+			}
 
+			std::cout << "ID: "   << response_packet.get_id()   << std::endl;
+			std::cout << "TYPE: " << response_packet.get_type() << std::endl;
+			std::cout << "DATA: " << response_packet.get_data() << std::endl;
+		}
 	}
 
 	void send_data(std::string& data) {
@@ -87,14 +106,22 @@ private:
 		}
 	}
 
+	int fetch()
+	{
+		return 0;
+	}
+
     const char* server_ip;
+	std::thread* p_main_thread;
     int server_port;
     int client_socket;
 	int id = 0;
+	bool quitting = false;
 };
 
 int main() {
     TCPClient client("127.0.0.1", PORT);
+	client.start_loop();
     return 0;
 }
 
