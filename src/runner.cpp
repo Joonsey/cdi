@@ -29,9 +29,23 @@ public:
         close(client_socket);
     }
 
+	Packet::Packet receive_response() {
+		std::string error;
+		char buffer[1024];
+		int bytes_received = recv(client_socket, buffer, 1024, 0);
+
+		if (bytes_received <= 0) {
+			Packet::Packet packet(id, "UNEXPECTED", Packet::Type::ERROR);
+			packet.serialize(error);
+			return packet;
+		}
+
+		return Packet::Packet::deserialize(buffer);
+	}
+
 private:
 	void init_connection() {
-		std::string response;
+		std::string init_message;
 
         client_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (client_socket == -1) {
@@ -50,9 +64,18 @@ private:
         }
 
 		Packet::Packet packet(228920, "hello, world", Packet::Type::INIT);
-		packet.serialize(response);
+		packet.serialize(init_message);
 
-		send_data(response);
+		send_data(init_message);
+
+
+		Packet::Packet response = receive_response();
+
+		std::cout << "ID: " << response.get_id() << std::endl;
+		std::cout << "TYPE: " << response.get_type() << std::endl;
+		std::cout << "DATA: " << response.get_data() << std::endl;
+
+
 	}
 
 	void send_data(std::string& data) {
@@ -67,6 +90,7 @@ private:
     const char* server_ip;
     int server_port;
     int client_socket;
+	int id = 0;
 };
 
 int main() {

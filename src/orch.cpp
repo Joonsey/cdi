@@ -50,14 +50,15 @@ class TCPServer {
 				}
 				std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << std::endl;
 
-				std::thread clientThread(&TCPServer::handle_client, this, clientSocket);
-				clientThread.detach();
+				std::thread client_thread(&TCPServer::handle_client, this, clientSocket);
+				client_thread.detach();
 			}
 		}
 
-		private:
+private:
     void handle_client(int client_socket) {
         char buffer[1024];
+		std::string response;
         while (true) {
             int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
             if (bytes_read <= 0) {
@@ -71,8 +72,25 @@ class TCPServer {
 			std::cout << "TYPE: " << packet.get_type() << std::endl;
 			std::cout << "DATA: " << packet.get_data() << std::endl;
 
+			if (packet.get_type() == Packet::Type::INIT) {
+				Packet::Packet response_packet(packet.get_id(), packet.get_data(), Packet::Type::INIT_RESPONSE);
+				packet.serialize(response);
+			}
+
+			if (response.empty()) return;
+
+			send_data(client_socket, response);
         }
     }
+
+	void send_data(int socket, std::string& data) {
+		ssize_t status = send(socket, data.data(), data.size(), 0);
+
+		if (status == -1) {
+			std::cout << status << std::endl;
+            std::cerr << "Error sending data to client" << std::endl;
+		}
+	}
 
     int port;
     int server_socket;

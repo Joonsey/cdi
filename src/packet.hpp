@@ -12,6 +12,7 @@ namespace Packet
 
 	enum Type {
 		INIT,
+		INIT_RESPONSE,
 		STATUS,
 		FETCH,
 		PULL,
