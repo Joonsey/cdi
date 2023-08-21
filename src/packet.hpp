@@ -4,7 +4,8 @@
 #include <cstdint>
 #define ID_SIZE 8
 #define TYPE_SIZE 2
-#define START_ID 1
+#define START_ID 1278927
+#define PREFIX "S"
 
 namespace Packet
 {

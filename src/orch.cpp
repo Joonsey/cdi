@@ -9,8 +9,12 @@
 #include <unistd.h>
 
 #include "packet.hpp"
+#include "crow_all.h"
 
 #define PORT 6969
+#define EXTERN_PORT 8000
+
+int temp_client_sock;
 
 class TCPServer {
 	public:
@@ -30,11 +34,13 @@ class TCPServer {
 
 			if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) == -1) {
 				std::cerr << "Error binding socket" << std::endl;
+				exit(1);
 				return;
 			}
 
 			if (listen(server_socket, 10) == -1) {
 				std::cerr << "Error listening on socket" << std::endl;
+				exit(1)
 				return;
 			}
 
@@ -55,14 +61,31 @@ class TCPServer {
 			}
 		}
 
+		void query_fetch(int socket, int runner_id) {
+			std::string buffer;
+			Packet::Packet packet(runner_id, "fetch", Packet::TYPE::FETCH);
+			packet.serialize(buffer);
+
+			send_data(socket, buffer);
+		}
+
+		void start_thread()
+		{
+			std::thread main_thread(&TCPServer::start, this);
+			p_main_thread = &main_thread;
+			main_thread.detach();
+		}
+
 private:
     void handle_client(int client_socket) {
         char buffer[1024];
 		std::string response;
         while (true) {
+			memset(buffer,0,sizeof(buffer));
             int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
             if (bytes_read <= 0) {
                 close(client_socket);
+				std::cout << "client disconnected" << std::endl;
                 break;
             }
 
@@ -73,16 +96,20 @@ private:
 			std::cout << "DATA: " << packet.get_data() << std::endl;
 
 			if (packet.get_type() == Packet::TYPE::INIT) {
-				Packet::Packet response_packet(packet.get_id(), packet.get_data(), Packet::TYPE::INIT_SUCCESS);
-				packet.serialize(response);
+				// needs to take the data from the packet and make a reference in a hastable.
+				// such that we can associate their own data with a concurrent connection (socket).
+				Packet::Packet response_packet(init_new_id(), packet.get_data(), Packet::TYPE::INIT_SUCCESS);
+				response_packet.serialize(response);
+				send_data(client_socket, response);
 			}
 
 			if (packet.get_type() == Packet::TYPE::FETCH) {
-				std::cout << stoi(packet.get_data()) << std::endl;
+				std::cout << stoi(packet.get_data().substr(1)) << std::endl;
 			}
 
 			if (response.empty()) return;
-			send_data(client_socket, response);
+
+			temp_client_sock = client_socket;
         }
     }
 
@@ -95,12 +122,36 @@ private:
 		}
 	}
 
+	int init_new_id()
+	{
+		// calculate new id based on concurrent users
+		return 2323;
+	}
+
     int port;
     int server_socket;
+	std::thread* p_main_thread;
 };
 
 int main() {
+
 	TCPServer server(PORT);
-	server.start();
+	server.start_thread();
+
+	crow::SimpleApp app;
+	app.loglevel(crow::LogLevel::Warning);
+
+	CROW_ROUTE(app, "/")([](){
+		return "hello, world";
+			});
+
+	CROW_ROUTE(app, "/fetch")([&](){
+		server.query_fetch(temp_client_sock, 200);
+		return "haha";
+			});
+
+	app.port(EXTERN_PORT).run();
+
+
 	return 0;
 }
