@@ -65,7 +65,7 @@ private:
             return;
         }
 
-		Packet::Packet packet(START_ID, "hello, world", Packet::TYPE::INIT);
+		Packet::Packet packet(INIT_ID, "hello, world", Packet::TYPE::INIT);
 		packet.serialize(init_message);
 
 		send_data(init_message);

@@ -16,9 +16,15 @@
 
 int temp_client_sock;
 
+struct Connection {
+	int socket;
+	int id;
+};
+
 class TCPServer {
 	public:
-		TCPServer(int port) : port(port) {}
+		TCPServer(int port) : port(port), oita(START_ID){
+		}
 
 		void start() {
 			server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -40,7 +46,7 @@ class TCPServer {
 
 			if (listen(server_socket, 10) == -1) {
 				std::cerr << "Error listening on socket" << std::endl;
-				exit(1)
+				exit(1);
 				return;
 			}
 
@@ -49,14 +55,14 @@ class TCPServer {
 			while (true) {
 				sockaddr_in client_address;
 				socklen_t clientAddrSize = sizeof(client_address);
-				int clientSocket = accept(server_socket, (struct sockaddr*)&client_address, &clientAddrSize);
-				if (clientSocket == -1) {
+				int client_socket = accept(server_socket, (struct sockaddr*)&client_address, &clientAddrSize);
+				if (client_socket == -1) {
 					std::cerr << "Error accepting connection" << std::endl;
 					continue;
 				}
 				std::cout << "Connection accepted from " << inet_ntoa(client_address.sin_addr) << std::endl;
 
-				std::thread client_thread(&TCPServer::handle_client, this, clientSocket);
+				std::thread client_thread(&TCPServer::handle_client, this, client_socket);
 				client_thread.detach();
 			}
 		}
@@ -76,6 +82,17 @@ class TCPServer {
 			main_thread.detach();
 		}
 
+		void print_connections()
+		{
+			for (const auto& entry : connections) {
+			const std::string& key = entry.first;
+			const Connection& conn = entry.second;
+			std::cout << "Key: " << key << ", Id: " << conn.id << ", Socket: " << conn.socket << std::endl;
+			}
+		}
+
+	std::unordered_map<std::string, Connection> connections;
+
 private:
     void handle_client(int client_socket) {
         char buffer[1024];
@@ -84,6 +101,7 @@ private:
 			memset(buffer,0,sizeof(buffer));
             int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
             if (bytes_read <= 0) {
+				remove_socket_from_connections(client_socket);
                 close(client_socket);
 				std::cout << "client disconnected" << std::endl;
                 break;
@@ -96,9 +114,18 @@ private:
 			std::cout << "DATA: " << packet.get_data() << std::endl;
 
 			if (packet.get_type() == Packet::TYPE::INIT) {
-				// needs to take the data from the packet and make a reference in a hastable.
-				// such that we can associate their own data with a concurrent connection (socket).
-				Packet::Packet response_packet(init_new_id(), packet.get_data(), Packet::TYPE::INIT_SUCCESS);
+				if (connections.find(packet.get_data()) != connections.end()) {
+					std::cout << "client with name already connected" << std::endl;
+					Packet::Packet response_packet(packet.get_id(), "client with name already connected", Packet::TYPE::INIT_FAILURE);
+					response_packet.serialize(response);
+					send_data(client_socket, response);
+					return;
+				}
+
+				int new_id = init_new_id();
+
+				connections[packet.get_data()] = {client_socket, new_id};
+				Packet::Packet response_packet(new_id, packet.get_data(), Packet::TYPE::INIT_SUCCESS);
 				response_packet.serialize(response);
 				send_data(client_socket, response);
 			}
@@ -124,13 +151,32 @@ private:
 
 	int init_new_id()
 	{
-		// calculate new id based on concurrent users
-		return 2323;
+		oita++;
+		return oita;
 	}
 
+	void remove_socket_from_connections(int socket_to_rm)
+	{
+		std::string key_to_rm;
+		for (const auto& entry : connections) {
+			const std::string& key = entry.first;
+			const Connection& conn = entry.second;
+
+			if (socket_to_rm == conn.socket)
+			{
+				key_to_rm = key;
+				break;
+			}
+		}
+
+		connections.erase(key_to_rm);
+	}
+
+	int oita;
     int port;
     int server_socket;
 	std::thread* p_main_thread;
+
 };
 
 int main() {
@@ -143,6 +189,11 @@ int main() {
 
 	CROW_ROUTE(app, "/")([](){
 		return "hello, world";
+			});
+
+	CROW_ROUTE(app, "/_print_conns")([&](){
+		server.print_connections();
+		return "success";
 			});
 
 	CROW_ROUTE(app, "/fetch")([&](){
