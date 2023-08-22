@@ -8,17 +8,19 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "utils.hpp"
 #include "packet.hpp"
 #include "crow_all.h"
 
 #define PORT 6969
 #define EXTERN_PORT 8000
 
-int temp_client_sock;
 
 struct Connection {
 	int socket;
 	int id;
+	std::string status;
+	std::string head;
 };
 
 class TCPServer {
@@ -67,12 +69,24 @@ class TCPServer {
 			}
 		}
 
-		void query_fetch(int socket, int runner_id) {
+		void query_fetch(std::string key) {
 			std::string buffer;
-			Packet::Packet packet(runner_id, "fetch", Packet::TYPE::FETCH);
+			Connection conn = connections[key];
+
+			Packet::Packet packet(conn.id, "fetch", Packet::TYPE::FETCH);
 			packet.serialize(buffer);
 
-			send_data(socket, buffer);
+			send_data(conn.socket, buffer);
+		}
+
+		void query_status(std::string key){
+			std::string buffer;
+			Connection conn = connections[key];
+
+			Packet::Packet packet(conn.id, "status,pls", Packet::TYPE::STATUS);
+			packet.serialize(buffer);
+
+			send_data(conn.socket, buffer);
 		}
 
 		void start_thread()
@@ -115,7 +129,6 @@ private:
 
 			if (packet.get_type() == Packet::TYPE::INIT) {
 				if (connections.find(packet.get_data()) != connections.end()) {
-					std::cout << "client with name already connected" << std::endl;
 					Packet::Packet response_packet(packet.get_id(), "client with name already connected", Packet::TYPE::INIT_FAILURE);
 					response_packet.serialize(response);
 					send_data(client_socket, response);
@@ -134,9 +147,15 @@ private:
 				std::cout << stoi(packet.get_data().substr(1)) << std::endl;
 			}
 
+			if (packet.get_type() == Packet::TYPE::STATUS)
+			{
+				Connection* conn = get_connection(client_socket);
+				update_status(packet, conn);
+
+			}
+
 			if (response.empty()) return;
 
-			temp_client_sock = client_socket;
         }
     }
 
@@ -149,14 +168,19 @@ private:
 		}
 	}
 
-	int init_new_id()
-	{
+	int init_new_id() {
 		oita++;
 		return oita;
 	}
 
-	void remove_socket_from_connections(int socket_to_rm)
-	{
+	void update_status(Packet::Packet packet, Connection *conn) {
+
+		std::string data = packet.get_data();
+		conn->head = data.substr(1, data.find('|') - 1); // offsetting to not include '1'
+		conn->status = data.substr(data.find('|') + 1); // same here
+	}
+
+	void remove_socket_from_connections(int socket_to_rm) {
 		std::string key_to_rm;
 		for (const auto& entry : connections) {
 			const std::string& key = entry.first;
@@ -171,6 +195,18 @@ private:
 
 		connections.erase(key_to_rm);
 	}
+
+	Connection* get_connection(int socket) {
+    for (auto& entry : connections) {
+        Connection* conn = &(entry.second);
+
+        if (socket == conn->socket) {
+            return conn;
+        }
+    }
+    return nullptr; // If connection not found
+}
+
 
 	int oita;
     int port;
@@ -196,9 +232,18 @@ int main() {
 		return "success";
 			});
 
-	CROW_ROUTE(app, "/fetch")([&](){
-		server.query_fetch(temp_client_sock, 200);
-		return "haha";
+	CROW_ROUTE(app, "/fetch/<path>")([&]
+		(std::string name){
+		server.query_fetch(name);
+		return "success";
+			});
+
+	CROW_ROUTE(app, "/status/<path>")([&]
+		(std::string name){
+		server.query_status(name);
+		std::string stat = server.connections[name].status;
+		std::string head = server.connections[name].head;
+		return format_string("STATUS: %s, HEAD: %s", {stat, head});
 			});
 
 	app.port(EXTERN_PORT).run();

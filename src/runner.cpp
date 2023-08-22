@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "packet.hpp"
+#include "utils.hpp"
 
 #define PORT 6969
 
@@ -65,7 +66,7 @@ private:
             return;
         }
 
-		Packet::Packet packet(INIT_ID, "hello, world", Packet::TYPE::INIT);
+		Packet::Packet packet(INIT_ID, "hello/world", Packet::TYPE::INIT);
 		packet.serialize(init_message);
 
 		send_data(init_message);
@@ -95,6 +96,13 @@ private:
 				send_data(response);
 			}
 
+			if (response_packet.get_type() == Packet::TYPE::STATUS) {
+				std::string data = produce_status();
+				Packet::Packet pack(id, data, Packet::TYPE::STATUS);
+				pack.serialize(response);
+				send_data(response);
+			}
+
 			std::cout << "ID: "   << response_packet.get_id()   << std::endl;
 			std::cout << "TYPE: " << response_packet.get_type() << std::endl;
 			std::cout << "DATA: " << response_packet.get_data() << std::endl;
@@ -110,10 +118,16 @@ private:
 		}
 	}
 
-	int fetch()
-	{
+	int fetch() {
 		return 200;
 	}
+
+	std::string produce_status() {
+		// S<latest_commit>|<status>
+		// needs git integration to complete
+		return format_string("S%s|%s", {"db9685c", "UP-TO-DATE"});
+	}
+
 
     const char* server_ip;
 	std::thread* p_main_thread;
