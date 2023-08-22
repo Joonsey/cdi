@@ -6,7 +6,7 @@
 namespace Orchestrator {
 
 	enum STATUS {
-		VIBING,
+		UNKNOWN,
 		FETCHING,
 		DEPLOYING,
 		PENDING
@@ -14,7 +14,7 @@ namespace Orchestrator {
 
 	std::string get_string_from_status(STATUS stat) {
 		switch(stat){
-			case (VIBING):    return "VIBING";
+			case (UNKNOWN):   return "UNKNOWN";
 			case (FETCHING):  return "FETCHING";
 			case (DEPLOYING): return "DEPLOYING";
 			case (PENDING):   return "PENDING";

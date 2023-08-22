@@ -216,40 +216,42 @@ namespace Orchestrator {
 
 	};
 
-	int main() {
+}
 
-		TCPServer server(PORT);
-		server.start_thread();
+int main() {
 
-		crow::SimpleApp app;
-		app.loglevel(crow::LogLevel::Warning);
+	Orchestrator::TCPServer server(PORT);
+	server.start_thread();
 
-		CROW_ROUTE(app, "/")([](){
-			return "hello, world";
-				});
+	crow::SimpleApp app;
+	app.loglevel(crow::LogLevel::Warning);
 
-		CROW_ROUTE(app, "/_print_conns")([&](){
-			server.print_connections();
-			return "success";
-				});
+	CROW_ROUTE(app, "/")([](){
+		return "hello, world";
+			});
 
-		CROW_ROUTE(app, "/fetch/<path>")([&]
-			(std::string name){
-			server.query_fetch(name);
-			return "success";
-				});
+	CROW_ROUTE(app, "/_print_conns")([&](){
+		server.print_connections();
+		return "success";
+			});
 
-		CROW_ROUTE(app, "/status/<path>")([&]
-			(std::string name){
-			server.query_status(name);
-			std::string stat = server.connections[name].status;
-			std::string head = server.connections[name].head;
-			return format_string("STATUS: %s, HEAD: %s", {stat, head});
-				});
+	CROW_ROUTE(app, "/fetch/<path>")([&]
+		(std::string name){
+		server.query_fetch(name);
+		return "success";
+			});
 
-		app.port(EXTERN_PORT).run();
+	CROW_ROUTE(app, "/status/<path>")([&]
+		(std::string name){
+		server.query_status(name);
+		Orchestrator::STATUS stat = server.connections[name].status;
+		std::string head = server.connections[name].head;
+		return format_string("STATUS: %s, HEAD: %s",
+				{Orchestrator::get_string_from_status(stat), head});
+		});
+
+	app.port(EXTERN_PORT).run();
 
 
-		return 0;
-	}
+	return 0;
 }

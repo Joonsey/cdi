@@ -128,7 +128,7 @@ private:
 	std::string produce_status() {
 		// S<latest_commit>|<status>
 		// needs git integration to complete
-		return format_string("S%s|%s", {"db9685c", Orchestrator::get_string_from_status(status)});
+		return format_string("S%s|%s", {"db9685c", std::to_string(status)});
 	}
 
 
