@@ -16,10 +16,13 @@
 class TCPClient {
 public:
     TCPClient(const char* server_ip, int server_port)
-		: server_ip(server_ip), server_port(server_port) {
+		: server_ip(server_ip)
+		, server_port(server_port)
+		, status(Orchestrator::STATUS::FETCHING)
+		, id(0)
+		, quitting(false)
+		{
 			init_connection();
-			id = 0;
-			quitting = false;
 		}
 
 	Packet::Packet receive_response() {
@@ -125,7 +128,7 @@ private:
 	std::string produce_status() {
 		// S<latest_commit>|<status>
 		// needs git integration to complete
-		return format_string("S%s|%s", {"db9685c", "UP-TO-DATE"});
+		return format_string("S%s|%s", {"db9685c", Orchestrator::get_string_from_status(status)});
 	}
 
 
@@ -135,6 +138,7 @@ private:
     int client_socket;
 	int id;
 	bool quitting;
+	Orchestrator::STATUS status;
 };
 
 int main() {

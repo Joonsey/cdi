@@ -2,6 +2,27 @@
 #include <vector>
 #pragma once
 
+
+namespace Orchestrator {
+
+	enum STATUS {
+		VIBING,
+		FETCHING,
+		DEPLOYING,
+		PENDING
+	};
+
+	std::string get_string_from_status(STATUS stat) {
+		switch(stat){
+			case (VIBING):    return "VIBING";
+			case (FETCHING):  return "FETCHING";
+			case (DEPLOYING): return "DEPLOYING";
+			case (PENDING):   return "PENDING";
+			default: return "ERORR";
+		}
+	}
+}
+
 std::string format_string(const std::string& format, const std::vector<std::string>& values) {
 	std::string result;
 	size_t last_pos = 0;
