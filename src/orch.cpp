@@ -112,7 +112,7 @@ private:
         char buffer[1024];
 		std::string response;
         while (true) {
-			memset(buffer,0,sizeof(buffer));
+			memset(buffer,0,sizeof(buffer)); // occationaly it appears as if this buffer is not cleaned.
             int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
             if (bytes_read <= 0) {
 				remove_socket_from_connections(client_socket);
