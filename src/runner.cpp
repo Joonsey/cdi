@@ -26,10 +26,17 @@ class FetchTask : public QueueTask {
 		};
 };
 
-class Pulltask : public QueueTask {
+class PullTask : public QueueTask {
 	public:
 		void process() override {
 			std::cout << "pulling..." << std::endl;
+		};
+};
+
+class DeployTask : public QueueTask {
+	public:
+		void process() override {
+			std::cout << "deploy..." << std::endl;
 		};
 };
 
