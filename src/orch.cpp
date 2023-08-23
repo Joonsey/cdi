@@ -175,9 +175,8 @@ namespace Orchestrator {
 		}
 
 		void update_status(Packet::Packet packet, Connection *conn) {
-
 			std::string data = packet.get_data();
-			conn->head = data.substr(1, data.find('|') - 1); // offsetting to not include '1'
+			conn->head = data.substr(1, data.find('|') - 1); // offsetting to not include '|'
 			conn->status = STATUS(std::stoi(data.substr(data.find('|') + 1))); // same here
 		}
 
@@ -240,6 +239,14 @@ int main() {
 		server.query_fetch(name);
 		return "success";
 			});
+
+	CROW_ROUTE(app, "/ping_all")([&](){
+			for (const auto conn : server.connections) {
+				server.query_status(conn.first);
+			}
+
+			return "pinged all";
+		});
 
 	CROW_ROUTE(app, "/status/<path>")([&]
 		(std::string name){

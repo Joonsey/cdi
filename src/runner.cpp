@@ -7,11 +7,31 @@
 #include <unistd.h>
 #include <chrono>
 #include <thread>
+#include <queue>
 
 #include "packet.hpp"
 #include "utils.hpp"
 
 #define PORT 6969
+
+class QueueTask {
+	public:
+		virtual void process() = 0;
+};
+
+class FetchTask : public QueueTask {
+	public:
+		void process() override {
+			std::cout << "fetching..." << std::endl;
+		};
+};
+
+class Pulltask : public QueueTask {
+	public:
+		void process() override {
+			std::cout << "pulling..." << std::endl;
+		};
+};
 
 class TCPClient {
 public:
@@ -39,15 +59,17 @@ public:
 		return Packet::Packet::deserialize(buffer);
 	}
 
-	void start_loop_threaded() {
-		std::thread main_thread(&TCPClient::main_loop, this);
+	void start_worker_thread() {
+		std::thread main_thread(&TCPClient::working_queue_processer, this);
 		p_main_thread = &main_thread;
 		main_thread.detach();
 	}
 
 	void start_loop() {
+		start_worker_thread();
 		main_loop();
 	}
+
 
 private:
 	void init_connection() {
@@ -91,6 +113,8 @@ private:
 			}
 
 			if (response_packet.get_type() == Packet::TYPE::FETCH) {
+				working_queue.push(new FetchTask());
+				std::cout << "adding fetch task " << std::endl;
 				int status = fetch();
 				std::string data = PREFIX;
 				data.append(std::to_string(status));
@@ -109,6 +133,17 @@ private:
 			std::cout << "ID: "   << response_packet.get_id()   << std::endl;
 			std::cout << "TYPE: " << response_packet.get_type() << std::endl;
 			std::cout << "DATA: " << response_packet.get_data() << std::endl;
+		}
+	}
+
+	void working_queue_processer() {
+		while (!quitting) {
+			if (working_queue.empty()) continue;
+
+			auto current_task = working_queue.front();
+			current_task->process();
+			working_queue.pop();
+			free(current_task);
 		}
 	}
 
@@ -138,6 +173,7 @@ private:
     int client_socket;
 	int id;
 	bool quitting;
+	std::queue<QueueTask*> working_queue;
 	Orchestrator::STATUS status;
 };
 
