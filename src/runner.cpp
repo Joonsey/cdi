@@ -49,12 +49,13 @@ class DeployTask : public QueueTask {
 
 class TCPClient {
 public:
-    TCPClient(const char* server_ip, int server_port)
+    TCPClient(const char* server_ip, int server_port, std::string repo)
 		: server_ip(server_ip)
 		, server_port(server_port)
 		, status({Orchestrator::STATUS::PENDING, "db9685c"})
 		, id(0)
 		, quitting(false)
+		, repo(repo)
 		{
 			init_connection();
 		}
@@ -96,7 +97,7 @@ private:
             return;
         }
 
-		Packet::Packet packet(INIT_ID, "hello/world", Packet::TYPE::INIT);
+		Packet::Packet packet(INIT_ID, repo, Packet::TYPE::INIT);
 		packet.serialize(init_message);
 
 		send_data(init_message);
@@ -194,6 +195,7 @@ private:
 
 
     const char* server_ip;
+    const std::string repo;
 	std::thread* p_main_thread;
     int server_port;
     int client_socket;
@@ -204,7 +206,7 @@ private:
 };
 
 int main() {
-    TCPClient client("127.0.0.1", PORT);
+    TCPClient client("127.0.0.1", PORT, "hello/world");
 	client.start_loop();
     return 0;
 }

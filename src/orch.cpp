@@ -177,7 +177,6 @@ namespace Orchestrator {
 				ssize_t status = send(socket, data.data(), data.size(), 0);
 
 				if (status == -1) {
-					std::cout << status << std::endl;
 					std::cerr << "Error sending data to client" << std::endl;
 				}
 			}
