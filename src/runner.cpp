@@ -14,29 +14,36 @@
 
 #define PORT 6969
 
+struct StatusInfo {
+	Orchestrator::STATUS status;
+	std::string head;
+};
+
 class QueueTask {
 	public:
-		virtual void process() = 0;
+		virtual void process(StatusInfo*) = 0;
 };
 
 class FetchTask : public QueueTask {
 	public:
-		void process() override {
-			std::cout << "fetching..." << std::endl;
+		void process(StatusInfo* status_ptr) override {
+			(*status_ptr).status = Orchestrator::STATUS::FETCHING;
+			sleep(5);
 		};
 };
 
 class PullTask : public QueueTask {
 	public:
-		void process() override {
-			std::cout << "pulling..." << std::endl;
+		void process(StatusInfo* status_ptr) override {
+			(*status_ptr).status = Orchestrator::STATUS::PULLING;
+			sleep(5);
 		};
 };
 
 class DeployTask : public QueueTask {
 	public:
-		void process() override {
-			std::cout << "deploy..." << std::endl;
+		void process(StatusInfo* status_ptr) override {
+			(*status_ptr).status = Orchestrator::STATUS::DEPLOYING;
 		};
 };
 
@@ -45,7 +52,7 @@ public:
     TCPClient(const char* server_ip, int server_port)
 		: server_ip(server_ip)
 		, server_port(server_port)
-		, status(Orchestrator::STATUS::FETCHING)
+		, status({Orchestrator::STATUS::PENDING, "db9685c"})
 		, id(0)
 		, quitting(false)
 		{
@@ -54,7 +61,7 @@ public:
 
 	Packet::Packet receive_response() {
 		std::string error;
-		char buffer[1024];
+		char buffer[1024] = {0};
 		int bytes_received = recv(client_socket, buffer, 1024, 0);
 
 		if (bytes_received <= 0) {
@@ -66,18 +73,9 @@ public:
 		return Packet::Packet::deserialize(buffer);
 	}
 
-	void start_worker_thread() {
-		std::thread main_thread(&TCPClient::working_queue_processer, this);
-		p_main_thread = &main_thread;
-		main_thread.detach();
-	}
-
 	void start_loop() {
-		start_worker_thread();
 		main_loop();
 	}
-
-
 private:
 	void init_connection() {
 		std::string init_message;
@@ -121,21 +119,32 @@ private:
 
 			if (response_packet.get_type() == Packet::TYPE::FETCH) {
 				working_queue.push(new FetchTask());
-				std::cout << "adding fetch task " << std::endl;
-				int status = fetch();
-				std::string data = PREFIX;
-				data.append(std::to_string(status));
-				Packet::Packet pack(id, data, Packet::TYPE::FETCH);
-				pack.serialize(response);
-				send_data(response);
 			}
 
+			if (response_packet.get_type() == Packet::TYPE::PULL) {
+				working_queue.push(new PullTask());
+			}
+
+			if (response_packet.get_type() == Packet::TYPE::DEPLOY) {
+				working_queue.push(new DeployTask());
+			}
+
+			/*
 			if (response_packet.get_type() == Packet::TYPE::STATUS) {
 				std::string data = produce_status();
 				Packet::Packet pack(id, data, Packet::TYPE::STATUS);
 				pack.serialize(response);
 				send_data(response);
 			}
+			*/
+			if (!working_queue.empty() && status.status == Orchestrator::STATUS::PENDING)
+			{
+				wake_up_working_queue();
+			}
+
+			Packet::Packet pack(id, produce_status() , Packet::TYPE::STATUS);
+			pack.serialize(response);
+			send_data(response);
 
 			std::cout << "ID: "   << response_packet.get_id()   << std::endl;
 			std::cout << "TYPE: " << response_packet.get_type() << std::endl;
@@ -143,15 +152,25 @@ private:
 		}
 	}
 
-	void working_queue_processer() {
+	void start_working_queue() {
 		while (!quitting) {
-			if (working_queue.empty()) continue;
+			if (working_queue.empty())
+			{
+				status.status = Orchestrator::STATUS::PENDING;
+				return;
+			}
 
 			auto current_task = working_queue.front();
-			current_task->process();
+			current_task->process(&status);
 			working_queue.pop();
 			free(current_task);
 		}
+	}
+
+	void wake_up_working_queue() {
+		std::thread main_thread(&TCPClient::start_working_queue, this);
+		p_main_thread = &main_thread;
+		main_thread.detach();
 	}
 
 	void send_data(std::string& data) {
@@ -170,7 +189,7 @@ private:
 	std::string produce_status() {
 		// S<latest_commit>|<status>
 		// needs git integration to complete
-		return format_string("S%s|%s", {"db9685c", std::to_string(status)});
+		return format_string("S%s|%s", {status.head, std::to_string(status.status)});
 	}
 
 
@@ -181,7 +200,7 @@ private:
 	int id;
 	bool quitting;
 	std::queue<QueueTask*> working_queue;
-	Orchestrator::STATUS status;
+	StatusInfo status;
 };
 
 int main() {

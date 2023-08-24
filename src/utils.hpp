@@ -8,6 +8,7 @@ namespace Orchestrator {
 	enum STATUS {
 		UNKNOWN,
 		FETCHING,
+		PULLING,
 		DEPLOYING,
 		PENDING
 	};
@@ -18,6 +19,7 @@ namespace Orchestrator {
 			case (FETCHING):  return "FETCHING";
 			case (DEPLOYING): return "DEPLOYING";
 			case (PENDING):   return "PENDING";
+			case (PULLING):   return "PULLING";
 			default: return "ERORR";
 		}
 	}
