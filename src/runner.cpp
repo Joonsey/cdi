@@ -19,6 +19,18 @@ struct StatusInfo {
 	std::string head;
 };
 
+
+void update_current_head(char* buff) {
+	FILE *pipe;
+	pipe = popen("git log -1 --pretty=%h", "r");
+	if (!pipe) {
+		perror("popen");
+	}
+
+	fgets(buff, sizeof(buff), pipe);
+	pclose(pipe);
+}
+
 class QueueTask {
 	public:
 		virtual void process(StatusInfo*) = 0;
@@ -28,7 +40,20 @@ class FetchTask : public QueueTask {
 	public:
 		void process(StatusInfo* status_ptr) override {
 			(*status_ptr).status = Orchestrator::STATUS::FETCHING;
-			sleep(5);
+			FILE *pipe;
+			char buff[128];
+
+			pipe = popen("git fetch", "r");
+			if (!pipe) {
+				perror("popen");
+			}
+
+			while (fgets(buff, sizeof(buff), pipe) != NULL) {
+				std::cout << buff;
+			}
+
+			pclose(pipe);
+
 		};
 };
 
@@ -36,7 +61,21 @@ class PullTask : public QueueTask {
 	public:
 		void process(StatusInfo* status_ptr) override {
 			(*status_ptr).status = Orchestrator::STATUS::PULLING;
-			sleep(5);
+			FILE *pipe;
+			char buff[128];
+
+			pipe = popen("git pull", "r");
+			if (!pipe) {
+				perror("popen");
+			}
+
+			while (fgets(buff, sizeof(buff), pipe) != NULL) {
+				std::cout << buff;
+			}
+
+			update_current_head(&status_ptr->head[0]);
+			pclose(pipe);
+
 		};
 };
 

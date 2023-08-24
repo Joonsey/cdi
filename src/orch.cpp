@@ -72,22 +72,26 @@ namespace Orchestrator {
 
 			void query_fetch(std::string key) {
 				std::string buffer;
-				Connection conn = connections[key];
+				Connection* conn = get_connection(key);
 
-				Packet::Packet packet(conn.id, "fetch", Packet::TYPE::FETCH);
+				if (conn == nullptr) return;
+
+				Packet::Packet packet(conn->id, "fetch", Packet::TYPE::FETCH);
 				packet.serialize(buffer);
 
-				send_data(conn.socket, buffer);
+				send_data(conn->socket, buffer);
 			}
 
 			void query_status(std::string key){
 				std::string buffer;
-				Connection conn = connections[key];
+				Connection* conn = get_connection(key);
 
-				Packet::Packet packet(conn.id, "status,pls", Packet::TYPE::STATUS);
+				if (conn == nullptr) return;
+
+				Packet::Packet packet(conn->id, "status,pls", Packet::TYPE::STATUS);
 				packet.serialize(buffer);
 
-				send_data(conn.socket, buffer);
+				send_data(conn->socket, buffer);
 			}
 
 			void start_thread()
@@ -109,12 +113,14 @@ namespace Orchestrator {
 			void query_pull(std::string key)
 			{
 				std::string buffer;
-				Connection conn = connections[key];
+				Connection* conn = get_connection(key);
 
-				Packet::Packet packet(conn.id, "pull,pls", Packet::TYPE::PULL);
+				if (conn == nullptr) return;
+
+				Packet::Packet packet(conn->id, "pull,pls", Packet::TYPE::PULL);
 				packet.serialize(buffer);
 
-				send_data(conn.socket, buffer);
+				send_data(conn->socket, buffer);
 
 			}
 
@@ -219,6 +225,12 @@ namespace Orchestrator {
 				return nullptr; // If connection not found
 			}
 
+			Connection* get_connection(std::string key)
+			{
+				if (connections.find(key) == connections.end()) return nullptr;
+				return &connections[key];
+			}
+
 			void keepalive()
 			{
 				// this should send a packet out to connections
@@ -287,6 +299,7 @@ int main() {
             //connection_json["id"] = connection.id;
             connection_json["status"] = connection.status;
             connection_json["head"] = connection.head;
+            connection_json["repo"] = key;
 
             wvalue_list.push_back(connection_json);
         }
@@ -297,33 +310,13 @@ int main() {
 		});
 
 	CROW_ROUTE(app, "/status/<path>")([&]
-		(std::string name){
-		if (!name.empty())
-		{
+			(std::string name){
 			server.query_status(name);
 			Orchestrator::STATUS stat = server.connections[name].status;
 			std::string head = server.connections[name].head;
 			return format_string("STATUS: %s, HEAD: %s",
 					{Orchestrator::get_string_from_status(stat), head});
-		}
-
-        crow::json::wvalue response;
-
-        for (const auto& entry : server.connections) {
-            const std::string& key = entry.first;
-            const Orchestrator::Connection& connection = entry.second;
-
-            crow::json::wvalue connectionJson;
-            connectionJson["socket"] = connection.socket;
-            connectionJson["id"] = connection.id;
-            connectionJson["status"] = connection.status;
-            connectionJson["head"] = connection.head;
-
-            response[key] = std::move(connectionJson);
-        }
-
-        return response.execute();
-		});
+			});
 
 	CROW_ROUTE(app, "/bootup/<path>")([&]
 		(std::string name){
