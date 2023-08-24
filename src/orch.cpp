@@ -274,13 +274,55 @@ int main() {
 			return "pinged all";
 		});
 
+	CROW_ROUTE(app, "/status/")([&](){
+        crow::json::wvalue::list wvalue_list;
+		crow::json::wvalue response;
+
+        for (const auto& entry : server.connections) {
+            const std::string& key = entry.first;
+            const Orchestrator::Connection& connection = entry.second;
+
+            crow::json::wvalue connection_json;
+            //connection_json["socket"] = connection.socket;
+            //connection_json["id"] = connection.id;
+            connection_json["status"] = connection.status;
+            connection_json["head"] = connection.head;
+
+            wvalue_list.push_back(connection_json);
+        }
+
+		response = std::move(wvalue_list);
+        return crow::response(std::move(response));
+
+		});
+
 	CROW_ROUTE(app, "/status/<path>")([&]
 		(std::string name){
-		server.query_status(name);
-		Orchestrator::STATUS stat = server.connections[name].status;
-		std::string head = server.connections[name].head;
-		return format_string("STATUS: %s, HEAD: %s",
-				{Orchestrator::get_string_from_status(stat), head});
+		if (!name.empty())
+		{
+			server.query_status(name);
+			Orchestrator::STATUS stat = server.connections[name].status;
+			std::string head = server.connections[name].head;
+			return format_string("STATUS: %s, HEAD: %s",
+					{Orchestrator::get_string_from_status(stat), head});
+		}
+
+        crow::json::wvalue response;
+
+        for (const auto& entry : server.connections) {
+            const std::string& key = entry.first;
+            const Orchestrator::Connection& connection = entry.second;
+
+            crow::json::wvalue connectionJson;
+            connectionJson["socket"] = connection.socket;
+            connectionJson["id"] = connection.id;
+            connectionJson["status"] = connection.status;
+            connectionJson["head"] = connection.head;
+
+            response[key] = std::move(connectionJson);
+        }
+
+        return response.execute();
 		});
 
 	CROW_ROUTE(app, "/bootup/<path>")([&]
