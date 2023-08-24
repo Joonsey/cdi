@@ -219,6 +219,14 @@ namespace Orchestrator {
 				return nullptr; // If connection not found
 			}
 
+			void keepalive()
+			{
+				// this should send a packet out to connections
+				// given a T time passing for each packet.
+				// it should always be a T time interval between packets
+				// such that the buffer does not get fed two packets before parsing.
+			}
+
 
 			int oita;
 			int port;
@@ -273,6 +281,12 @@ int main() {
 		std::string head = server.connections[name].head;
 		return format_string("STATUS: %s, HEAD: %s",
 				{Orchestrator::get_string_from_status(stat), head});
+		});
+
+	CROW_ROUTE(app, "/bootup/<path>")([&]
+		(std::string name){
+			system(format_string("build/main %s &", {name}).c_str());
+			return format_string("booted up: %s", {name});
 		});
 
 	app.port(EXTERN_PORT).run();
