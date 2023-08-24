@@ -205,9 +205,16 @@ private:
 	StatusInfo status;
 };
 
-int main() {
-    TCPClient client("127.0.0.1", PORT, "hello/world");
-	client.start_loop();
+int main(int argv, char ** args) {
+	if (argv > 1) {
+		std::cout << args[1] << std::endl;
+		TCPClient client("127.0.0.1", PORT, args[1]);
+		client.start_loop();
+	}
+	else {
+		TCPClient client("127.0.0.1", PORT, "hello/world");
+		client.start_loop();
+	}
     return 0;
 }
 
