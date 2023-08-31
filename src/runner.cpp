@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cassert>
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
@@ -86,6 +87,17 @@ class DeployTask : public QueueTask {
 		};
 };
 
+
+class CloneTask : public QueueTask {
+	public:
+		void process(StatusInfo* status_ptr) override {
+			(*status_ptr).status = Orchestrator::STATUS::DEPLOYING;
+
+			//git clone <repo>
+
+		};
+};
+
 class TCPClient {
 public:
     TCPClient(const char* server_ip, int server_port, std::string repo)
@@ -113,9 +125,15 @@ public:
 		return Packet::Packet::deserialize(buffer);
 	}
 
+	void set_upstream(std::string upstream)
+	{
+		this->upstream_repo = upstream;
+	}
+
 	void start_loop() {
 		main_loop();
 	}
+	std::queue<QueueTask*> working_queue;
 private:
 	void init_connection() {
 		std::string init_message;
@@ -235,24 +253,39 @@ private:
 
     const char* server_ip;
     const std::string repo;
+    std::string upstream_repo;
 	std::thread* p_main_thread;
     int server_port;
     int client_socket;
 	int id;
 	bool quitting;
-	std::queue<QueueTask*> working_queue;
 	StatusInfo status;
 };
 
-int main(int argv, char ** args) {
-	if (argv > 1) {
-		std::cout << args[1] << std::endl;
-		TCPClient client("127.0.0.1", PORT, args[1]);
-		client.start_loop();
+int main(int argc, char * argv[]) {
+	TCPClient *client = nullptr;
+	if (argc > 1) {
+		std::cout << argv[1] << std::endl;
+		client = new TCPClient("127.0.0.1", PORT, argv[1]);
+		client->start_loop();
 	}
 	else {
-		TCPClient client("127.0.0.1", PORT, "hello/world");
-		client.start_loop();
+		client = new TCPClient("127.0.0.1", PORT, "hello/world");
+		client->start_loop();
+	}
+	for (int i = 0; i < argc; i++)
+	{
+		if (strcasecmp(argv[i], "-clone"))
+		{
+			client->working_queue.push(new CloneTask());
+			// try doing procedural clone
+
+			assert("ASSERT: clone option was passsed, but no upstream repo argument" && (i+1 <= argc));
+			client->set_upstream(argv[i+1]);
+
+			i++;
+			//return;
+		}
 	}
     return 0;
 }

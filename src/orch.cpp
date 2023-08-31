@@ -14,6 +14,7 @@
 
 #define PORT 6969
 #define EXTERN_PORT 8000
+#define INCLUDE_SLASH_PREFIX true
 
 namespace Orchestrator {
 
@@ -322,6 +323,15 @@ int main() {
 		(std::string name){
 			system(format_string("build/main %s &", {name}).c_str());
 			return format_string("booted up: %s", {name});
+		});
+
+	CROW_ROUTE(app, "/cloneup/<path>")([&]
+		(std::string upstream_url){
+			std::string repo_name;
+			if (INCLUDE_SLASH_PREFIX) repo_name = upstream_url.substr(upstream_url.find_last_of('/'));
+			else repo_name = upstream_url.substr(upstream_url.find_last_of('/')+1);
+			system(format_string("build/main %s -clone %s &", {repo_name, upstream_url}).c_str());
+			return format_string("booted up: %s with upstream %s", {repo_name, upstream_url});
 		});
 
 	app.port(EXTERN_PORT).run();
